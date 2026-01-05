@@ -9,31 +9,33 @@ BistooltipConstants = BistooltipConstants or {}
 -- ============================================================
 
 BistooltipConstants.UI = {
-    -- Main frame
-    MAIN_FRAME_WIDTH = 520,
-    MAIN_FRAME_HEIGHT = 640,
-    MAIN_FRAME_MIN_WIDTH = 480,
-    MAIN_FRAME_MIN_HEIGHT = 360,
-    MAIN_FRAME_MAX_WIDTH = 1000,
-    MAIN_FRAME_MAX_HEIGHT = 800,
+    -- Main frame (increased for BIS Checklist mode)
+    MAIN_FRAME_WIDTH = 720,
+    MAIN_FRAME_HEIGHT = 700,
+    MAIN_FRAME_MIN_WIDTH = 600,
+    MAIN_FRAME_MIN_HEIGHT = 500,
+    MAIN_FRAME_MAX_WIDTH = 1200,
+    MAIN_FRAME_MAX_HEIGHT = 900,
     
     -- Spec frame (item list)
-    SPEC_FRAME_HEIGHT = 370,
+    SPEC_FRAME_HEIGHT = 420,
     
     -- Checklist panel
-    CHECKLIST_PANEL_WIDTH = 330,
+    CHECKLIST_PANEL_WIDTH = 380,
     
-    -- Icons
+    -- Icons (original sizes)
     ICON_SIZE_TINY = 12,
     ICON_SIZE_SMALL = 14,
     ICON_SIZE_MEDIUM = 16,
     ICON_SIZE_LARGE = 28,
     ICON_SIZE_ITEM = 40,
+    ICON_SIZE_GEM = 18,
+    ICON_SIZE_ENCHANT = 16,
     
     -- Dropdown widths
-    CLASS_DROPDOWN_WIDTH = 110,
-    SPEC_DROPDOWN_WIDTH = 180,
-    PHASE_DROPDOWN_WIDTH = 70,
+    CLASS_DROPDOWN_WIDTH = 120,
+    SPEC_DROPDOWN_WIDTH = 200,
+    PHASE_DROPDOWN_WIDTH = 80,
     
     -- Buttons
     BUTTON_WIDTH_SMALL = 80,
@@ -41,10 +43,16 @@ BistooltipConstants.UI = {
     BUTTON_WIDTH_LARGE = 140,
     
     -- Search box
-    SEARCH_BOX_WIDTH = 220,
+    SEARCH_BOX_WIDTH = 200,
     
     -- Checkbox
-    CHECKBOX_WIDTH = 120,
+    CHECKBOX_WIDTH = 110,
+    
+    -- Plan column (for checklist mode)
+    PLAN_COLUMN_WIDTH = 180,
+    ITEM_NAME_MAX_CHARS = 28,
+    BOSS_NAME_MAX_CHARS = 22,
+    ENCHANT_NAME_MAX_CHARS = 24,
 }
 
 -- ============================================================
@@ -88,12 +96,22 @@ BistooltipConstants.COLORS = {
     -- Source colors
     SOURCE_ZONE = "cfcfcf",
     SOURCE_BOSS = "ffd000",
-    SOURCE_EMBLEM = "55aaff",
+    SOURCE_EMBLEM = "00ffcc",  -- Cyan for Ascension emblems
     
     -- Status colors
     OWNED_EQUIPPED = "13f621",  -- Bright green
     OWNED_BAGS = "f6e013",      -- Yellow/gold
     BOE_MARKER = "ffd700",      -- Gold
+    
+    -- Emblem of Ascension - cyan/turquoise for visibility against purple items
+    ASCENSION = "00ffcc",
+    
+    -- BIS Checklist Panel colors
+    CHECKLIST_BOSS = "c41f3b",      -- Dark red (WoW Death Knight color)
+    CHECKLIST_ZONE = "ff8000",      -- Orange (better visibility)
+    CHECKLIST_ITEM = "ffd700",      -- Gold
+    CHECKLIST_SLOT = "ffd700",      -- Gold (same as slot names in main container)
+    CHECKLIST_SUBTOTAL = "ff7d0a",  -- Orange (WoW Druid color)
 }
 
 -- Helper to format color string
@@ -154,31 +172,31 @@ BistooltipConstants.SPEC_BY_CLASSFILE_TAB = {
 
 BistooltipConstants.SPEC_TABLE_DEFAULT = {
     columns = {
-        { weight = 40 },  -- Slot name
-        { width = 44 },   -- Enhancements
-        { width = 58 },   -- Top 1
-        { width = 58 },   -- Top 2
-        { width = 44 },   -- Top 3
-        { width = 44 },   -- Top 4
-        { width = 44 },   -- Top 5
-        { width = 44 },   -- Top 6
+        { weight = 45 },  -- Slot name
+        { width = 50 },   -- Enhancements
+        { width = 60 },   -- Top 1
+        { width = 60 },   -- Top 2
+        { width = 48 },   -- Top 3
+        { width = 48 },   -- Top 4
+        { width = 48 },   -- Top 5
+        { width = 48 },   -- Top 6
     },
-    space = 1,
+    space = 2,
     align = "middle",
 }
 
 BistooltipConstants.SPEC_TABLE_CHECKLIST = {
     columns = {
-        { width = 80 },   -- Slot
-        { weight = 40 },  -- Plan (Boss/Item)
-        { width = 58 },   -- BIS
-        { width = 58 },   -- BIS2
-        { width = 44 },   -- Alt 3
-        { width = 44 },   -- Alt 4
-        { width = 44 },   -- Alt 5
-        { width = 44 },   -- Alt 6
+        { width = 90 },   -- Slot (wider for visibility)
+        { weight = 55 },  -- Plan (Boss/Item/Enchant) - takes more space
+        { width = 60 },   -- BIS
+        { width = 60 },   -- BIS2
+        { width = 48 },   -- Alt 3
+        { width = 48 },   -- Alt 4
+        { width = 48 },   -- Alt 5
+        { width = 48 },   -- Alt 6
     },
-    space = 1,
+    space = 2,
     align = "middle",
 }
 
@@ -375,7 +393,7 @@ end
 BistooltipConstants.EMBLEM_VENDORS = {
     -- Custom server emblem
     ["Emblem of Ascension"] = {
-        color = "ff00ff",  -- Magenta/purple for custom
+        color = "00ffcc",  -- Cyan/turquoise for visibility
         shortName = "Ascension",
         icon = "Interface\\Icons\\Spell_Holy_SummonChampion",
     },

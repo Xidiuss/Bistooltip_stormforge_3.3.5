@@ -60,6 +60,9 @@ local emblemFilterMode = false  -- NEW: Filter to show only emblem sources
 local checklistSummaryLabel = nil
 local emblemSummaryLabel = nil  -- NEW: Shows emblem totals
 
+-- Emblem of Ascension item ID for icon
+local EMBLEM_OF_ASCENSION_ID = 131008
+
 -- ============================================================
 -- 3.3.5 safe tooltip helper
 -- ============================================================
@@ -255,7 +258,7 @@ local function GetAllItemSources(item_id)
             type = "emblem",
             currency = emblemSource.currency or "Emblems",
             cost = emblemSource.cost,
-            color = emblemInfo and emblemInfo.color or "ff00ff",
+            color = emblemInfo and emblemInfo.color or (Constants.COLORS.ASCENSION or "00ffcc"),
             icon = emblemInfo and emblemInfo.icon,
         })
     end
@@ -366,7 +369,7 @@ local function FormatSourcesText(sources, compact)
         elseif src.type == "emblem" then
             -- Use emblem color from Constants
             local emblemInfo = Constants and Constants.EMBLEM_VENDORS and Constants.EMBLEM_VENDORS[src.currency]
-            local color = (emblemInfo and emblemInfo.color) or src.color or "ff00ff"
+            local color = (emblemInfo and emblemInfo.color) or src.color or (Constants.COLORS.ASCENSION or "00ffcc")
             local text = "|cff" .. color .. (src.currency or "Emblem")
             if src.cost then
                 text = text .. " x" .. src.cost
@@ -500,7 +503,8 @@ local function ParseGemStatsFromTooltip(item_id)
     return tmp
 end
 
--- Build gem stat token (e.g., "20STR" or "12SP/10SPI")
+-- Build gem stat token (e.g., "20 STR" or "12 SP / 10 SPI")
+-- Now uses hardcoded GemData.lua first for accurate display
 local function BuildGemStatToken(item_id)
     if not item_id or item_id <= 0 then return nil end
     if GEM_TOKEN_CACHE[item_id] ~= nil then return GEM_TOKEN_CACHE[item_id] end
@@ -511,11 +515,31 @@ local function BuildGemStatToken(item_id)
         return nil
     end
 
+    -- PRIMARY: Use hardcoded gem data (most accurate)
+    if _G.Bistooltip_GetGemStats then
+        local hardcoded = Bistooltip_GetGemStats(name)
+        if hardcoded then
+            GEM_TOKEN_CACHE[item_id] = hardcoded
+            return hardcoded
+        end
+    end
+    
+    -- Also check global table directly
+    if _G.Bistooltip_gem_stats then
+        local key = string.lower(name)
+        local hardcoded = Bistooltip_gem_stats[key]
+        if hardcoded then
+            GEM_TOKEN_CACHE[item_id] = hardcoded
+            return hardcoded
+        end
+    end
+
+    -- FALLBACK: Try to parse stats from API/tooltip
     local acc = {}
     local ITEM_CLASS_GEM = _G.ITEM_CLASS_GEM or "Gem"
     local ITEM_SUBCLASS_GEM_META = _G.ITEM_SUBCLASS_GEM_META or "Meta"
 
-    -- Primary: GetItemStats (fast, locale-independent)
+    -- Try GetItemStats (fast, locale-independent)
     if _G.GetItemStats then
         local stats = GetItemStats(link or ("item:" .. tostring(item_id) .. ":0:0:0:0:0:0:0"))
         if type(stats) == "table" then
@@ -561,23 +585,23 @@ local function BuildGemStatToken(item_id)
         for _, x in ipairs(tmp) do
             local vv = x.val
             if type(vv) == "number" and vv == math.floor(vv) then
-                table.insert(parts, tostring(vv) .. x.abbr)
+                table.insert(parts, tostring(vv) .. " " .. x.abbr)
             else
-                table.insert(parts, string.format("%s%s", tostring(vv), x.abbr))
+                table.insert(parts, string.format("%s %s", tostring(vv), x.abbr))
             end
         end
     end
 
-    local token = table.concat(parts, "/")
+    local token = table.concat(parts, " / ")
     
     -- Add META prefix for meta gems
     if class == ITEM_CLASS_GEM and subclass == ITEM_SUBCLASS_GEM_META and token ~= "" then
-        token = "META:" .. token
+        token = "META: " .. token
     end
     
     -- Fallback to abbreviated name if no stats found
     if token == "" then
-        token = Utils.TruncateText(name, 12)
+        token = Utils.TruncateText(name, 16)
     end
 
     GEM_TOKEN_CACHE[item_id] = token
@@ -588,12 +612,20 @@ end
 -- Enchant Name Helper (NEW)
 -- ============================================================
 
+-- Strip "Enchant" prefix from enchant names (e.g., "Enchant Gloves - Crusher" -> "Gloves - Crusher")
+local function StripEnchantPrefix(name)
+    if not name then return nil end
+    -- Remove "Enchant " prefix
+    local stripped = name:gsub("^Enchant%s+", "")
+    return stripped
+end
+
 local function GetEnchantName(enhancement)
     if not enhancement then return nil end
     
     if enhancement.type == "spell" and enhancement.id then
         local name = GetSpellInfo(enhancement.id)
-        return name
+        return StripEnchantPrefix(name)
     elseif enhancement.type == "item" and enhancement.id then
         local name = GetItemInfo(enhancement.id)
         -- Check if it's a gem (exclude from enchant display)
@@ -602,10 +634,32 @@ local function GetEnchantName(enhancement)
         if class == ITEM_CLASS_GEM then
             return nil -- It's a gem, not an enchant
         end
-        return name
+        return StripEnchantPrefix(name)
     end
     
     return nil
+end
+
+-- Get enchant info (name, icon, id, type) from slot
+local function GetSlotEnchantInfo(slot)
+    if not slot or not slot.enhs then return nil, nil, nil, nil end
+    
+    for _, enh in ipairs(slot.enhs) do
+        if enh.type == "spell" and enh.id then
+            local name, _, icon = GetSpellInfo(enh.id)
+            if name then
+                return StripEnchantPrefix(name), icon, enh.id, "spell"
+            end
+        elseif enh.type == "item" and enh.id then
+            local name, _, _, _, _, class, _, _, _, texture = GetItemInfo(enh.id)
+            local ITEM_CLASS_GEM = _G.ITEM_CLASS_GEM or "Gem"
+            if name and class ~= ITEM_CLASS_GEM then
+                return StripEnchantPrefix(name), texture, enh.id, "item"
+            end
+        end
+    end
+    
+    return nil, nil, nil, nil
 end
 
 local function GetSlotEnchantName(slot)
@@ -658,19 +712,29 @@ local function CollectGemIdsFromEnhancements(enhs)
     return filtered
 end
 
--- Build gem plan text with stat abbreviations
+-- Build gem plan text with stat abbreviations and icons
 local function BuildGemPlanText(gemIds)
     if not gemIds or #gemIds == 0 then return "" end
 
     local tokens = {}
+    local iconSize = Constants.UI.ICON_SIZE_GEM or 22
+    
     for _, id in ipairs(gemIds) do
         local t = BuildGemStatToken(id)
         if not t or t == "" then t = "..." end
-        table.insert(tokens, "|cff55aaff" .. t .. "|r")
+        
+        -- Get gem icon
+        local _, _, _, _, _, _, _, _, _, texture = GetItemInfo(id)
+        local iconStr = ""
+        if texture then
+            iconStr = string.format("|T%s:%d:%d:0:0|t", texture, iconSize, iconSize)
+        end
+        
+        table.insert(tokens, iconStr .. "|cff55aaff" .. t .. "|r")
     end
 
     if #tokens == 0 then return "" end
-    return table.concat(tokens, " + ")
+    return table.concat(tokens, "  ")
 end
 
 -- ============================================================
@@ -774,8 +838,45 @@ local function EnsureChecklistPanel()
 
     -- Title
     local title = checklistPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-    title:SetPoint("TOP", 0, -15)
+    title:SetPoint("TOP", 0, -12)
     title:SetText("|cffffd100BIS CHECKLIST|r")
+
+    -- Progress bar frame under title
+    local progressFrame = CreateFrame("Frame", nil, checklistPanel)
+    progressFrame:SetPoint("TOP", title, "BOTTOM", 0, -6)
+    progressFrame:SetSize(280, 22)
+    
+    -- Progress bar background
+    local progressBg = progressFrame:CreateTexture(nil, "BACKGROUND")
+    progressBg:SetAllPoints()
+    progressBg:SetTexture("Interface\\ChatFrame\\ChatFrameBackground")
+    progressBg:SetVertexColor(0.1, 0.1, 0.1, 0.9)
+    
+    -- Progress bar fill
+    local progressFill = progressFrame:CreateTexture(nil, "ARTWORK")
+    progressFill:SetPoint("LEFT", progressFrame, "LEFT", 2, 0)
+    progressFill:SetHeight(18)
+    progressFill:SetWidth(1)
+    progressFill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    progressFill:SetVertexColor(0.8, 0.2, 0.2, 1)  -- Red default
+    checklistPanel._progressFill = progressFill
+    
+    -- Progress bar border
+    local progressBorder = CreateFrame("Frame", nil, progressFrame)
+    progressBorder:SetAllPoints()
+    progressBorder:SetBackdrop({
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 10,
+    })
+    progressBorder:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+    
+    -- Progress text
+    local progressText = progressFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    progressText:SetPoint("CENTER", progressFrame, "CENTER", 0, 0)
+    progressText:SetTextColor(1, 1, 1, 1)
+    progressText:SetText("0 / 0")
+    checklistPanel._progressText = progressText
+    checklistPanel._progressFrame = progressFrame
 
     -- Make ESC close this panel
     AddToUISpecialFrames("BistooltipChecklistPanel", mainFrameUISpecialName)
@@ -795,14 +896,14 @@ local function EnsureChecklistPanel()
         end
     end)
 
-    -- ScrollFrame container
+    -- ScrollFrame container (adjusted position for progress bar)
     checklistContainer = AceGUI:Create("ScrollFrame")
     checklistContainer:SetLayout("List")
     checklistContainer:SetWidth(310)
     checklistContainer:SetHeight(0)
 
     checklistContainer.frame:SetParent(checklistPanel)
-    checklistContainer.frame:SetPoint("TOPLEFT", 15, -45)
+    checklistContainer.frame:SetPoint("TOPLEFT", 15, -65)  -- Moved down for progress bar
     checklistContainer.frame:SetPoint("BOTTOMRIGHT", -15, 15)
     checklistContainer.frame:Show()
 
@@ -1116,12 +1217,17 @@ local function DrawBossHeaderGUI(container, bossName, instanceName, difficulty)
     group:SetFullWidth(true)
 
     local label = AceGUI:Create("Label")
-    label:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_LARGE, "OUTLINE")
+    label:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_LARGE + 2, "OUTLINE")
+    
+    -- Use new colors from Constants
+    local bossColor = Constants.COLORS.CHECKLIST_BOSS or "c41f3b"
+    local zoneColor = Constants.COLORS.CHECKLIST_ZONE or "ff8000"
     
     -- Format: Boss Name (10HM)
     local diffText = difficulty and (" |cffaaaaaa(" .. difficulty .. ")|r") or ""
-    local text = string.format("\n|cffef5350%s|r%s\n|cff90a4ae%s|r", 
-        bossName:upper(), diffText, instanceName:gsub("[%(%)]", ""))
+    local text = string.format("\n|cff%s%s|r%s\n|cff%s%s|r", 
+        bossColor, bossName:upper(), diffText, 
+        zoneColor, instanceName:gsub("[%(%)]", ""))
     
     label:SetText(text)
     label:SetJustifyH("CENTER")
@@ -1131,15 +1237,23 @@ local function DrawBossHeaderGUI(container, bossName, instanceName, difficulty)
     container:AddChild(group)
 end
 
+-- Crop icon texture to remove Blizzard borders (zoom ~108%)
+-- Defined early so it can be used by DrawItemRowGUI
+local function SetIconTexCoord(iconWidget)
+    if iconWidget and iconWidget.image then
+        iconWidget.image:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    end
+end
+
 local function DrawItemRowGUI(container, item_id, slot_name, sources)
     local row = NewSimpleGroup()
     row:SetLayout("Flow")
     row:SetFullWidth(true)
 
-    -- Icon
+    -- Icon (larger)
     local icon = AceGUI:Create("Icon")
-    icon:SetImageSize(28, 28)
-    icon:SetWidth(34)
+    icon:SetImageSize(30, 30)
+    icon:SetWidth(36)
     local _, link, quality, _, _, _, _, _, _, texture = GetItemInfo(item_id)
 
     if not texture then
@@ -1148,6 +1262,7 @@ local function DrawItemRowGUI(container, item_id, slot_name, sources)
     end
 
     icon:SetImage(texture)
+    SetIconTexCoord(icon)  -- Crop Blizzard border
 
     icon:SetCallback("OnClick", function()
         if link then ChatEdit_InsertLink(link) end
@@ -1163,22 +1278,26 @@ local function DrawItemRowGUI(container, item_id, slot_name, sources)
     end)
     icon:SetCallback("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Text label with slot, name, and sources
+    -- Text label with slot, name, and sources (larger font)
     local label = AceGUI:Create("InteractiveLabel")
-    label:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_SMALL, "")
+    label:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_MEDIUM, "")
 
     local itemName = GetItemInfo(item_id) or ("loading " .. item_id)
-    local colorHex = Utils.GetItemQualityHex(quality)
+    local slotColor = Constants.COLORS.CHECKLIST_SLOT or "ffd700"  -- Gold for slots
+    
+    -- Get item quality color for item name
+    local _, _, quality = GetItemInfo(item_id)
+    local itemColorHex = Utils.GetItemQualityHex(quality) or "ffffffff"
 
-    -- Format sources - highlight emblems
+    -- Format sources - use cyan for Ascension emblems
     local sourceText = ""
     if sources and #sources > 0 then
         local parts = {}
         for _, src in ipairs(sources) do
             if src.type == "emblem" then
-                local emblemInfo = Constants and Constants.EMBLEM_VENDORS and Constants.EMBLEM_VENDORS[src.currency]
-                local color = emblemInfo and emblemInfo.color or "ff00ff"
-                local shortName = emblemInfo and emblemInfo.shortName or src.currency
+                -- Use ASCENSION color for all emblems
+                local color = Constants.COLORS.ASCENSION or "00ffcc"
+                local shortName = src.currency or "Emblem"
                 local costText = src.cost and (" x" .. src.cost) or ""
                 table.insert(parts, "|cff" .. color .. shortName .. costText .. "|r")
             end
@@ -1188,14 +1307,14 @@ local function DrawItemRowGUI(container, item_id, slot_name, sources)
         end
     end
 
-    local text = string.format("|cff00ccff[%s]|r\n|c%s%s|r%s",
-        slot_name:upper(),
-        colorHex, itemName,
+    local text = string.format("|cff%s[%s]|r\n|c%s%s|r%s",
+        slotColor, slot_name:upper(),
+        itemColorHex, itemName,
         sourceText
     )
 
     label:SetText(text)
-    label:SetWidth(240)
+    label:SetWidth(260)
 
     label:SetCallback("OnClick", function() if link then ChatEdit_InsertLink(link) end end)
     label:SetCallback("OnEnter", function(widget)
@@ -1230,65 +1349,194 @@ local function UpdateChecklistPanel()
 
     local groups, totalMissing, emblemGroups = BuildChecklistGroups()
 
-    -- Header
-    local headerGroup = NewSimpleGroup()
-    headerGroup:SetFullWidth(true)
-    local headerLbl = AceGUI:Create("Label")
-    
     if emblemFilterMode then
-        -- Show emblem totals in header
-        local parts = {}
-        for currency, data in pairs(emblemGroups) do
-            local emblemInfo = Constants and Constants.EMBLEM_VENDORS and Constants.EMBLEM_VENDORS[currency]
-            local color = emblemInfo and emblemInfo.color or "ff00ff"
-            table.insert(parts, string.format("|cff%s%s: %d|r", color, currency, data.total))
-        end
-        if #parts > 0 then
-            headerLbl:SetText("Total Needed:\n" .. table.concat(parts, "\n"))
-        else
-            headerLbl:SetText("|cff888888No emblem items missing|r")
-        end
-    else
-        headerLbl:SetText(string.format("Items Missing: |cffffd100%d|r", totalMissing))
-    end
-    
-    headerLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_MEDIUM)
-    headerLbl:SetColor(1, 1, 1)
-    headerLbl:SetJustifyH("CENTER")
-    headerGroup:AddChild(headerLbl)
-    checklistPanel._container:AddChild(headerGroup)
-
-    if emblemFilterMode then
-        -- Show items grouped by emblem currency
-        local currencies = {}
-        for c in pairs(emblemGroups) do table.insert(currencies, c) end
-        table.sort(currencies)
+        -- ASCEND MODE: Show only Emblem of Ascension items grouped by cost
+        local ascensionData = emblemGroups["Emblem of Ascension"]
         
-        for _, currency in ipairs(currencies) do
-            local data = emblemGroups[currency]
-            local emblemInfo = Constants and Constants.EMBLEM_VENDORS and Constants.EMBLEM_VENDORS[currency]
-            local color = emblemInfo and emblemInfo.color or "ff00ff"
-            
-            -- Currency header
-            local currHeader = NewSimpleGroup()
-            currHeader:SetLayout("Flow")
-            currHeader:SetFullWidth(true)
-            
-            local currLbl = AceGUI:Create("Label")
-            currLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_LARGE, "OUTLINE")
-            currLbl:SetText(string.format("\n|cff%s%s|r |cffaaaaaa(Total: %d)|r", color, currency, data.total))
-            currLbl:SetJustifyH("CENTER")
-            currLbl:SetFullWidth(true)
-            currHeader:AddChild(currLbl)
-            checklistPanel._container:AddChild(currHeader)
-            
-            -- Items
-            for _, it in ipairs(data.items) do
-                DrawItemRowGUI(checklistPanel._container, it.id, it.slot .. " (" .. it.cost .. ")", it.sources)
-            end
+        if not ascensionData or #ascensionData.items == 0 then
+            -- No Emblem of Ascension items
+            local headerGroup = NewSimpleGroup()
+            headerGroup:SetFullWidth(true)
+            local headerLbl = AceGUI:Create("Label")
+            headerLbl:SetText("|cff888888No Emblem of Ascension items missing|r")
+            headerLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_MEDIUM)
+            headerLbl:SetJustifyH("CENTER")
+            headerGroup:AddChild(headerLbl)
+            checklistPanel._container:AddChild(headerGroup)
+            return
         end
+        
+        -- Group items by cost
+        local itemsByCost = {}
+        for _, it in ipairs(ascensionData.items) do
+            local cost = it.cost or 0
+            if not itemsByCost[cost] then
+                itemsByCost[cost] = { items = {}, subtotal = 0 }
+            end
+            table.insert(itemsByCost[cost].items, it)
+            itemsByCost[cost].subtotal = itemsByCost[cost].subtotal + cost
+        end
+        
+        -- Sort costs (ascending)
+        local costs = {}
+        for c in pairs(itemsByCost) do table.insert(costs, c) end
+        table.sort(costs)
+        
+        local grandTotal = 0
+        local emblemInfo = Constants and Constants.EMBLEM_VENDORS and Constants.EMBLEM_VENDORS["Emblem of Ascension"]
+        local color = emblemInfo and emblemInfo.color or (Constants.COLORS.ASCENSION or "00ffcc")
+        
+        for _, cost in ipairs(costs) do
+            local data = itemsByCost[cost]
+            local itemCount = #data.items
+            
+            -- Cost group header
+            local costHeader = NewSimpleGroup()
+            costHeader:SetLayout("Flow")
+            costHeader:SetFullWidth(true)
+            
+            local costLbl = AceGUI:Create("Label")
+            costLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_LARGE + 2, "OUTLINE")
+            costLbl:SetText(string.format("\n|cff%sEmblem of Ascension|r |cffffffff[x%d]|r\n", color, cost))
+            costLbl:SetFullWidth(true)
+            costLbl:SetJustifyH("CENTER")
+            costHeader:AddChild(costLbl)
+            checklistPanel._container:AddChild(costHeader)
+            
+            -- Items in this cost group
+            for _, it in ipairs(data.items) do
+                local row = NewSimpleGroup()
+                row:SetLayout("Flow")
+                row:SetFullWidth(true)
+                
+                -- Icon
+                local icon = AceGUI:Create("Icon")
+                icon:SetImageSize(26, 26)
+                icon:SetWidth(32)
+                local _, link, quality, _, _, _, _, _, _, texture = GetItemInfo(it.id)
+                
+                if not texture then
+                    texture = "Interface\\Icons\\Inv_misc_questionmark"
+                    if QueuePreload then QueuePreload(it.id) end
+                end
+                
+                icon:SetImage(texture)
+                SetIconTexCoord(icon)  -- Crop Blizzard border
+                icon:SetCallback("OnClick", function()
+                    if link then ChatEdit_InsertLink(link) end
+                end)
+                icon:SetCallback("OnEnter", function(widget)
+                    GameTooltip:SetOwner(widget.frame, "ANCHOR_TOPRIGHT")
+                    if link then
+                        GameTooltip:SetHyperlink(link)
+                    else
+                        TooltipSetItemByID(GameTooltip, it.id)
+                    end
+                    GameTooltip:Show()
+                end)
+                icon:SetCallback("OnLeave", function() GameTooltip:Hide() end)
+                
+                -- Item name and slot - GOLD for slots
+                local label = AceGUI:Create("InteractiveLabel")
+                label:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_MEDIUM, "")
+                
+                local itemName = GetItemInfo(it.id) or ("Item " .. it.id)
+                local hexColor = Utils.GetItemQualityHex(quality)
+                local slotColor = Constants.COLORS.CHECKLIST_SLOT or "ffd700"
+                
+                label:SetText(string.format("|cff%s[%s]|r |c%s%s|r", 
+                    slotColor, (it.slot or ""):upper(), hexColor, Utils.SmartTrunc(itemName, 22)))
+                label:SetWidth(240)
+                
+                label:SetCallback("OnClick", function() if link then ChatEdit_InsertLink(link) end end)
+                label:SetCallback("OnEnter", function(widget)
+                    GameTooltip:SetOwner(widget.frame, "ANCHOR_TOPRIGHT")
+                    if link then
+                        GameTooltip:SetHyperlink(link)
+                    else
+                        TooltipSetItemByID(GameTooltip, it.id)
+                    end
+                    GameTooltip:Show()
+                end)
+                label:SetCallback("OnLeave", function() GameTooltip:Hide() end)
+                
+                row:AddChild(icon)
+                row:AddChild(label)
+                checklistPanel._container:AddChild(row)
+            end
+            
+            -- Subtotal for this cost group - ORANGE color
+            local subtotalGroup = NewSimpleGroup()
+            subtotalGroup:SetFullWidth(true)
+            local subtotalLbl = AceGUI:Create("Label")
+            subtotalLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_MEDIUM, "")
+            local subtotalColor = Constants.COLORS.CHECKLIST_SUBTOTAL or "ff7d0a"
+            subtotalLbl:SetText(string.format("|cff%s%d items × %d = %d|r\n", subtotalColor, itemCount, cost, data.subtotal))
+            subtotalLbl:SetFullWidth(true)
+            subtotalLbl:SetJustifyH("CENTER")
+            subtotalGroup:AddChild(subtotalLbl)
+            checklistPanel._container:AddChild(subtotalGroup)
+            
+            grandTotal = grandTotal + data.subtotal
+        end
+        
+        -- Grand total separator and summary
+        local sepGroup = NewSimpleGroup()
+        sepGroup:SetFullWidth(true)
+        local sepLbl = AceGUI:Create("Label")
+        sepLbl:SetText("\n|cffffffff────────────────────|r")
+        sepLbl:SetFullWidth(true)
+        sepGroup:AddChild(sepLbl)
+        checklistPanel._container:AddChild(sepGroup)
+        
+        local totalGroup = NewSimpleGroup()
+        totalGroup:SetFullWidth(true)
+        local totalLbl = AceGUI:Create("Label")
+        totalLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_LARGE, "OUTLINE")
+        totalLbl:SetText(string.format("|cff%sTOTAL COST: %d|r", color, grandTotal))
+        totalLbl:SetFullWidth(true)
+        totalLbl:SetJustifyH("CENTER")
+        totalGroup:AddChild(totalLbl)
+        checklistPanel._container:AddChild(totalGroup)
+        
     else
         -- Regular boss-grouped view
+        
+        -- Update progress bar (instead of Items Missing label)
+        if checklistPanel._progressFill and checklistPanel._progressText then
+            local totalSlots = 0
+            local collectedSlots = 0
+            
+            -- Count total BIS slots and collected
+            if currentFilteredData then
+                for _, slot in ipairs(currentFilteredData) do
+                    if slot[1] and slot[1] > 0 then
+                        totalSlots = totalSlots + 1
+                        if SlotBISCompleted and SlotBISCompleted(slot) then
+                            collectedSlots = collectedSlots + 1
+                        end
+                    end
+                end
+            end
+            
+            local barWidth = 276  -- Progress bar internal width
+            local percentage = totalSlots > 0 and (collectedSlots / totalSlots) or 0
+            
+            checklistPanel._progressFill:SetWidth(math.max(1, barWidth * percentage))
+            checklistPanel._progressText:SetText(string.format("%d / %d", collectedSlots, totalSlots))
+            
+            -- Color based on progress
+            if percentage >= 1 then
+                checklistPanel._progressFill:SetVertexColor(0.1, 0.9, 0.1, 1)  -- Green
+            elseif percentage >= 0.6 then
+                checklistPanel._progressFill:SetVertexColor(0.1, 0.8, 0.1, 1)  -- Light green
+            elseif percentage >= 0.3 then
+                checklistPanel._progressFill:SetVertexColor(1.0, 0.6, 0.0, 1)  -- Orange
+            else
+                checklistPanel._progressFill:SetVertexColor(0.9, 0.2, 0.2, 1)  -- Red
+            end
+        end
+        
         local zones = {}
         for z in pairs(groups or {}) do table.insert(zones, z) end
         table.sort(zones)
@@ -1400,11 +1648,13 @@ local function createItemFrame(item_id, size, with_checkmark)
 
     if not itemName then
         item_frame:SetImage("Interface\\Icons\\INV_Misc_QuestionMark")
+        SetIconTexCoord(item_frame)  -- Crop border
         QueuePreload(item_id)
         return item_frame
     end
 
     item_frame:SetImage(itemIcon)
+    SetIconTexCoord(item_frame)  -- Crop Blizzard border
 
     if with_checkmark then
         local texCheck = "Interface\\RaidFrame\\ReadyCheck-Ready"
@@ -1603,13 +1853,18 @@ local function CreateBossItemInfoFrame(slot)
     local group = NewSimpleGroup()
     group:SetLayout("List")
     group:SetAutoAdjustHeight(false)
-    group:SetHeight(48)  -- Increased height for enchant line
+    group:SetHeight(56)
+    group:SetWidth(Constants.UI.PLAN_COLUMN_WIDTH or 180)
 
     local item_id = slot and slot[1]
     local boss = ""
     local itemName = ""
     local difficulty = nil
     local enchantName = nil
+    local enchantIcon = nil
+    local enchantId = nil
+    local enchantType = nil
+    local emblemInfo = nil
 
     if item_id and item_id > 0 then
         local name = GetItemInfo(item_id)
@@ -1617,17 +1872,24 @@ local function CreateBossItemInfoFrame(slot)
             if QueuePreload then QueuePreload(item_id) end
             name = "Item " .. tostring(item_id)
         end
-        itemName = Utils.TruncateText(name, 24)
+        itemName = Utils.TruncateText(name, Constants.UI.ITEM_NAME_MAX_CHARS or 28)
 
         -- Get source with difficulty
         local sources = GetAllItemSources(item_id)
-        if #sources > 0 and sources[1].type == "raid" then
-            boss = Utils.TruncateText(sources[1].boss, 18)
-            difficulty = sources[1].difficulty
+        for _, src in ipairs(sources) do
+            if src.type == "raid" then
+                boss = Utils.TruncateText(src.boss, Constants.UI.BOSS_NAME_MAX_CHARS or 22)
+                difficulty = src.difficulty
+            elseif src.type == "emblem" then
+                emblemInfo = src
+            end
         end
         
-        -- Get enchant name
-        enchantName = GetSlotEnchantName(slot)
+        -- Get enchant name, icon, id, and type
+        enchantName, enchantIcon, enchantId, enchantType = GetSlotEnchantInfo(slot)
+        if enchantName then
+            enchantName = Utils.TruncateText(enchantName, Constants.UI.ENCHANT_NAME_MAX_CHARS or 24)
+        end
     end
 
     -- Boss line with difficulty tag
@@ -1636,9 +1898,18 @@ local function CreateBossItemInfoFrame(slot)
     bossLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_MEDIUM, "OUTLINE")
     bossLbl:SetJustifyH("LEFT")
     
-    local bossText = boss ~= "" and ("|cffffd200" .. boss .. "|r") or " "
-    if difficulty then
-        bossText = bossText .. " |cffaaaaaa(" .. difficulty .. ")|r"
+    local bossText = ""
+    if boss ~= "" then
+        bossText = "|cffffd200" .. boss .. "|r"
+        if difficulty then
+            bossText = bossText .. " |cffaaaaaa(" .. difficulty .. ")|r"
+        end
+    elseif emblemInfo then
+        -- Show emblem source if no boss - use cyan color
+        local color = Constants.COLORS and Constants.COLORS.ASCENSION or "00ffcc"
+        bossText = "|cff" .. color .. (emblemInfo.currency or "Emblem") .. " x" .. (emblemInfo.cost or "?") .. "|r"
+    else
+        bossText = "|cff666666Unknown Source|r"
     end
     bossLbl:SetText(bossText)
     group:AddChild(bossLbl)
@@ -1648,33 +1919,76 @@ local function CreateBossItemInfoFrame(slot)
     itemLbl:SetFullWidth(true)
     itemLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_MEDIUM, "OUTLINE")
     itemLbl:SetJustifyH("LEFT")
-    itemLbl:SetText(itemName ~= "" and ("|cffff4040" .. itemName .. "|r") or " ")
+    itemLbl:SetText(itemName ~= "" and ("|cffff8040" .. itemName .. "|r") or " ")
     group:AddChild(itemLbl)
 
-    -- Enchant line (NEW)
-    local enchLbl = AceGUI:Create("Label")
-    enchLbl:SetFullWidth(true)
-    enchLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_SMALL, "")
-    enchLbl:SetJustifyH("LEFT")
-    if enchantName then
-        enchLbl:SetText("|cff00ff00" .. Utils.TruncateText(enchantName, 20) .. "|r")
+    -- Enchant line with clickable icon
+    if enchantName and enchantId then
+        local enchGroup = NewSimpleGroup()
+        enchGroup:SetFullWidth(true)
+        enchGroup:SetLayout("Flow")
+        enchGroup:SetAutoAdjustHeight(false)
+        enchGroup:SetHeight(20)
+        
+        -- Enchant icon with tooltip
+        local iconSize = Constants.UI.ICON_SIZE_ENCHANT or 16
+        local enchIcon = AceGUI:Create("Icon")
+        enchIcon:SetImageSize(iconSize, iconSize)
+        enchIcon:SetWidth(iconSize + 2)
+        enchIcon:SetHeight(iconSize + 2)
+        
+        if enchantIcon then
+            enchIcon:SetImage(enchantIcon)
+        else
+            enchIcon:SetImage("Interface\\Icons\\Trade_Engraving")
+        end
+        
+        -- Add tooltip callbacks
+        enchIcon:SetCallback("OnEnter", function(widget)
+            GameTooltip:SetOwner(widget.frame, "ANCHOR_RIGHT")
+            if enchantType == "spell" then
+                local link = GetSpellLink(enchantId)
+                if link then
+                    GameTooltip:SetHyperlink(link)
+                else
+                    GameTooltip:SetSpellByID(enchantId)
+                end
+            else
+                TooltipSetItemByID(GameTooltip, enchantId)
+            end
+            GameTooltip:Show()
+        end)
+        enchIcon:SetCallback("OnLeave", function(widget)
+            GameTooltip:Hide()
+        end)
+        
+        enchGroup:AddChild(enchIcon)
+        
+        -- Enchant name label
+        local enchLbl = AceGUI:Create("Label")
+        enchLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_SMALL, "")
+        enchLbl:SetText("|cff00ff00" .. enchantName .. "|r")
+        enchLbl:SetWidth(140)
+        enchGroup:AddChild(enchLbl)
+        
+        group:AddChild(enchGroup)
     else
-        enchLbl:SetText(" ")
+        -- Empty line if no enchant
+        local emptyLbl = AceGUI:Create("Label")
+        emptyLbl:SetText("")
+        emptyLbl:SetFullWidth(true)
+        group:AddChild(emptyLbl)
     end
-    group:AddChild(enchLbl)
 
     return group
 end
 
 -- ============================================================
--- Draw Gem Plan Row (ENHANCED with stat abbreviations)
+-- Draw Gem Plan Row (with clickable icons and tooltips)
 -- ============================================================
 
 local function DrawGemPlanRow(gemIds)
     if not gemIds or #gemIds == 0 then return end
-
-    local txt = BuildGemPlanText(gemIds)
-    if not txt or txt == "" then return end
 
     local e1 = AceGUI:Create("Label"); e1:SetText(" ")
     local e2 = AceGUI:Create("Label"); e2:SetText(" ")
@@ -1682,34 +1996,83 @@ local function DrawGemPlanRow(gemIds)
     spec_frame:AddChild(e2)
 
     local box = NewSimpleGroup()
-    box:SetLayout("Fill")
+    box:SetLayout("Flow")
     box:SetAutoAdjustHeight(false)
     box:SetHeight(26)
     box:SetUserData("cell", { colspan = 6 })
 
-    if box.frame.SetClipsChildren then
-        box.frame:SetClipsChildren(true)
-    end
-
     box.frame:SetBackdrop({
         bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12,
+        tile = true, tileSize = 16, edgeSize = 10,
         insets = { left = 2, right = 2, top = 2, bottom = 2 },
     })
-    box.frame:SetBackdropColor(0, 0, 0, 0.35)
-    box.frame:SetBackdropBorderColor(0.10, 0.55, 1.00, 0.65)
+    box.frame:SetBackdropColor(0, 0, 0, 0.4)
+    box.frame:SetBackdropBorderColor(0.10, 0.55, 1.00, 0.7)
 
-    local lbl = AceGUI:Create("Label")
-    lbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_SMALL, "OUTLINE")
-    lbl:SetJustifyH("LEFT")
-    lbl:SetJustifyV("TOP")
-    lbl:SetFullWidth(true)
-    lbl:SetText("|cff55aaffGems:|r " .. txt)
-    if lbl.label then
-        lbl.label:SetWordWrap(true)
+    -- Left padding spacer
+    local leftPad = AceGUI:Create("Label")
+    leftPad:SetWidth(6)
+    leftPad:SetText("")
+    box:AddChild(leftPad)
+
+    local iconSize = 16  -- Smaller gems to fit better
+    
+    for i, id in ipairs(gemIds) do
+        -- Add spacer between gem groups (icon+text)
+        if i > 1 then
+            local spacer = AceGUI:Create("Label")
+            spacer:SetWidth(12)
+            spacer:SetText("")
+            box:AddChild(spacer)
+        end
+        
+        -- Create gem icon with tooltip
+        local gemIcon = AceGUI:Create("Icon")
+        gemIcon:SetImageSize(iconSize, iconSize)
+        gemIcon:SetWidth(iconSize + 2)
+        gemIcon:SetHeight(iconSize + 2)
+        
+        local name, itemLink, _, _, _, _, _, _, _, texture = GetItemInfo(id)
+        if texture then
+            gemIcon:SetImage(texture)
+            SetIconTexCoord(gemIcon)  -- Crop Blizzard border
+        else
+            gemIcon:SetImage("Interface\\Icons\\INV_Misc_QuestionMark")
+            if QueuePreload then QueuePreload(id) end
+        end
+        
+        -- Add tooltip callbacks
+        gemIcon:SetCallback("OnEnter", function(widget)
+            GameTooltip:SetOwner(widget.frame, "ANCHOR_RIGHT")
+            if itemLink then
+                GameTooltip:SetHyperlink(itemLink)
+            else
+                TooltipSetItemByID(GameTooltip, id)
+            end
+            GameTooltip:Show()
+        end)
+        gemIcon:SetCallback("OnLeave", function(widget)
+            GameTooltip:Hide()
+        end)
+        gemIcon:SetCallback("OnClick", function(widget)
+            if itemLink then
+                SetItemRef(itemLink, itemLink, "LeftButton")
+            end
+        end)
+        
+        box:AddChild(gemIcon)
+        
+        -- Add stat text
+        local t = BuildGemStatToken(id)
+        if t and t ~= "" then
+            local statLbl = AceGUI:Create("Label")
+            statLbl:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_SMALL, "OUTLINE")
+            statLbl:SetText("|cff55aaff" .. t .. "|r")
+            statLbl:SetWidth(85)
+            box:AddChild(statLbl)
+        end
     end
-    box:AddChild(lbl)
 
     do
         local orig = box.OnRelease
@@ -1727,9 +2090,10 @@ end
 -- ============================================================
 
 local function drawItemSlot(slot)
+    -- Slot name label (bold)
     local f = AceGUI:Create("Label")
-    f:SetText(slot.slot_name)
-    f:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_LARGE, "")
+    f:SetText("|cffffd700" .. slot.slot_name .. "|r")
+    f:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_LARGE, "OUTLINE")
     spec_frame:AddChild(f)
 
     local gemIds = nil
@@ -1780,8 +2144,24 @@ local function drawItemSlot(slot)
         end
     end
 
+    -- Gem plan row (only in checklist mode)
     if bisChecklistMode then
         DrawGemPlanRow(gemIds)
+    end
+    
+    -- Visual separator line between slots
+    if bisChecklistMode then
+        -- Create separator spanning all columns
+        for col = 1, 8 do
+            local sep = AceGUI:Create("Label")
+            if col == 1 then
+                sep:SetText("|cff444444─────────────────────────────────────────────────────────────────────────────|r")
+            else
+                sep:SetText("")
+            end
+            sep:SetFont(Constants.FONTS.DEFAULT, 6, "")
+            spec_frame:AddChild(sep)
+        end
     end
 end
 
@@ -1808,18 +2188,13 @@ local function drawTableHeader(frame)
     end
     frame:AddChild(h2)
 
+    -- Headers: BIS, TOP1, TOP2, TOP3, TOP4, TOP5
     for i = 1, 6 do
         f = AceGUI:Create("Label")
-        if bisChecklistMode then
-            if i == 1 then
-                f:SetText("BIS")
-            elseif i == 2 then
-                f:SetText("BIS²")
-            else
-                f:SetText("Top " .. i)
-            end
+        if i == 1 then
+            f:SetText("|cff00ff00BIS|r")
         else
-            f:SetText("Top " .. i)
+            f:SetText("TOP" .. (i - 1))
         end
         f:SetColor(color, color, color)
         frame:AddChild(f)
@@ -1888,8 +2263,8 @@ drawSpecData = function()
         return false
     end
 
-    -- NEW: Check if slot has any emblem source items
-    local function slotHasEmblemSource(slot)
+    -- Check if slot has Emblem of Ascension source (for ASCEND filter)
+    local function slotHasAscensionSource(slot)
         if not emblemFilterMode then return true end
         
         for _, iid in ipairs(slot) do
@@ -1897,7 +2272,10 @@ drawSpecData = function()
             if isHorde and Bistooltip_horde_to_ali and Bistooltip_horde_to_ali[iid] then
                 id = Bistooltip_horde_to_ali[iid]
             end
-            if HasEmblemSource(id) then
+            
+            -- Check specifically for Emblem of Ascension
+            local cost, currency = GetEmblemCost(id)
+            if currency == "Emblem of Ascension" then
                 return true
             end
         end
@@ -1905,7 +2283,7 @@ drawSpecData = function()
     end
 
     for i, slot in ipairs(slots) do
-        if rowMatches(slot) and slotHasEmblemSource(slot) then
+        if rowMatches(slot) and slotHasAscensionSource(slot) then
             if bisChecklistMode and SlotBISCompleted(slot) then
                 -- Skip completed slots in checklist mode
             else
@@ -1919,32 +2297,36 @@ drawSpecData = function()
         if not bisChecklistMode then
             checklistSummaryLabel:SetText("")
         elseif emblemFilterMode then
-            checklistSummaryLabel:SetText("|cffff00ffEmblems filter|r: Showing only emblem-purchasable items.")
+            checklistSummaryLabel:SetText("|cffff00ffASCEND MODE|r: Showing Emblem of Ascension items only")
         else
             checklistSummaryLabel:SetText("|cffffff00BIS checklist|r: Boss/Item + gem plan shown. Full list in right panel.")
         end
     end
 
-    -- NEW: Update emblem summary
+    -- Update emblem summary with icon - ONLY show in ASCEND mode
     if emblemSummaryLabel then
-        if bisChecklistMode then
+        if bisChecklistMode and emblemFilterMode then
             local totals = CalculateMissingEmblems()
-            local parts = {}
+            local ascensionData = totals["Emblem of Ascension"]
             
-            for currency, data in pairs(totals) do
-                local emblemInfo = Constants and Constants.EMBLEM_VENDORS and Constants.EMBLEM_VENDORS[currency]
-                local color = emblemInfo and emblemInfo.color or "ff00ff"
-                local shortName = emblemInfo and emblemInfo.shortName or currency
+            if ascensionData and ascensionData.total > 0 then
+                -- Use cyan color from Constants
+                local color = Constants.COLORS and Constants.COLORS.ASCENSION or "00ffcc"
                 
-                table.insert(parts, string.format("|cff%s%s: %d|r", color, shortName, data.total))
-            end
-            
-            if #parts > 0 then
-                emblemSummaryLabel:SetText(table.concat(parts, "  "))
+                -- Get emblem icon
+                local iconSize = 20
+                local _, _, _, _, _, _, _, _, _, emblemTexture = GetItemInfo(EMBLEM_OF_ASCENSION_ID)
+                local iconStr = ""
+                if emblemTexture then
+                    iconStr = string.format("|T%s:%d:%d:0:0|t ", emblemTexture, iconSize, iconSize)
+                end
+                
+                emblemSummaryLabel:SetText(string.format("%s|cff%sEmblem of Ascension:\n%d|r", iconStr, color, ascensionData.total))
             else
-                emblemSummaryLabel:SetText("|cff888888No emblem items missing|r")
+                emblemSummaryLabel:SetText("|cff00ff00✓ All Ascension items collected!|r")
             end
         else
+            -- Hide emblem summary when not in ASCEND mode
             emblemSummaryLabel:SetText("")
         end
     end
@@ -2353,6 +2735,9 @@ function BistooltipAddon:createMainFrame()
     end)
     searchGroup:AddChild(missingToggle)
 
+    -- Forward declare emblemToggle so checklistToggle callback can reference it
+    local emblemToggle
+
     local checklistToggle = AceGUI:Create("CheckBox")
     checklistToggle:SetLabel("BIS checklist")
     checklistToggle:SetWidth(Constants.UI.CHECKBOX_WIDTH)
@@ -2363,6 +2748,15 @@ function BistooltipAddon:createMainFrame()
         -- Persist
         if self.db and self.db.char then
             self.db.char.bis_checklist = bisChecklistMode
+        end
+
+        -- Enable/disable emblem toggle
+        if emblemToggle then
+            emblemToggle:SetDisabled(not bisChecklistMode)
+            if not bisChecklistMode then
+                emblemFilterMode = false
+                emblemToggle:SetValue(false)
+            end
         end
 
         -- Mutual exclusion with "Only missing"
@@ -2381,10 +2775,10 @@ function BistooltipAddon:createMainFrame()
     end)
     searchGroup:AddChild(checklistToggle)
 
-    -- NEW: Emblem filter toggle (only visible when checklist mode is on)
-    local emblemToggle = AceGUI:Create("CheckBox")
-    emblemToggle:SetLabel("Emblems only")
-    emblemToggle:SetWidth(100)
+    -- Emblem filter toggle (only enabled when checklist mode is on)
+    emblemToggle = AceGUI:Create("CheckBox")
+    emblemToggle:SetLabel("ASCEND")
+    emblemToggle:SetWidth(80)
     emblemToggle:SetValue(emblemFilterMode and true or false)
     emblemToggle:SetDisabled(not bisChecklistMode)
     emblemToggle:SetCallback("OnValueChanged", function(_, _, val)
@@ -2392,37 +2786,6 @@ function BistooltipAddon:createMainFrame()
         drawSpecData()
     end)
     searchGroup:AddChild(emblemToggle)
-
-    -- Update emblem toggle state when checklist changes
-    local origChecklistCallback = checklistToggle:GetCallback("OnValueChanged")
-    checklistToggle:SetCallback("OnValueChanged", function(widget, event, val)
-        bisChecklistMode = val and true or false
-
-        -- Persist
-        if self.db and self.db.char then
-            self.db.char.bis_checklist = bisChecklistMode
-        end
-
-        -- Enable/disable emblem toggle
-        emblemToggle:SetDisabled(not bisChecklistMode)
-        if not bisChecklistMode then
-            emblemFilterMode = false
-            emblemToggle:SetValue(false)
-        end
-
-        -- Mutual exclusion with "Only missing"
-        if bisChecklistMode then
-            showOnlyMissing = false
-            missingToggle:SetValue(false)
-            missingToggle:SetDisabled(true)
-        else
-            missingToggle:SetDisabled(false)
-            DestroyChecklistPanel()
-        end
-
-        ApplySpecTable()
-        drawSpecData()
-    end)
 
     if bisChecklistMode then
         missingToggle:SetDisabled(true)
@@ -2435,7 +2798,7 @@ function BistooltipAddon:createMainFrame()
 
     main_frame:AddChild(searchGroup)
 
-    -- Checklist hint label
+    -- Checklist hint label row
     local checklistGroup = NewSimpleGroup()
     checklistGroup:SetFullWidth(true)
     checklistGroup:SetLayout("Flow")
@@ -2446,11 +2809,12 @@ function BistooltipAddon:createMainFrame()
     checklistSummaryLabel:SetText("")
     checklistGroup:AddChild(checklistSummaryLabel)
 
-    -- NEW: Emblem summary label
+    -- Emblem summary label with icon (only visible in ASCEND mode)
     emblemSummaryLabel = AceGUI:Create("Label")
-    emblemSummaryLabel:SetWidth(200)
+    emblemSummaryLabel:SetWidth(300)
     emblemSummaryLabel:SetFont(Constants.FONTS.DEFAULT, Constants.FONTS.SIZE_MEDIUM, "OUTLINE")
     emblemSummaryLabel:SetText("")
+    emblemSummaryLabel:SetJustifyH("CENTER")
     checklistGroup:AddChild(emblemSummaryLabel)
 
     main_frame:AddChild(checklistGroup)

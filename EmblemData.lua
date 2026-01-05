@@ -39,78 +39,90 @@ end
 local ASCENSION_ITEMS = {
     -- ==================
     -- Tier 10 Sanctified (264 -> 277)
+    -- These are example items - uncomment and adjust for your server
     -- ==================
     
     -- Death Knight
-    -- [51312] = 95,  -- Sanctified Scourgelord Helmet
-    -- [51314] = 60,  -- Sanctified Scourgelord Shoulderplates
-    -- [51310] = 95,  -- Sanctified Scourgelord Battleplate
-    -- [51313] = 60,  -- Sanctified Scourgelord Gauntlets
-    -- [51311] = 95,  -- Sanctified Scourgelord Legplates
+    [51312] = 95,  -- Sanctified Scourgelord Helmet
+    [51314] = 60,  -- Sanctified Scourgelord Shoulderplates
+    [51310] = 95,  -- Sanctified Scourgelord Battleplate
+    [51313] = 60,  -- Sanctified Scourgelord Gauntlets
+    [51311] = 95,  -- Sanctified Scourgelord Legplates
     
     -- Druid
-    -- [51147] = 95,  -- Sanctified Lasherweave Helmet
-    -- [51149] = 60,  -- Sanctified Lasherweave Pauldrons
-    -- [51145] = 95,  -- Sanctified Lasherweave Robes
-    -- [51148] = 60,  -- Sanctified Lasherweave Gloves
-    -- [51146] = 95,  -- Sanctified Lasherweave Legplates
+    [51147] = 95,  -- Sanctified Lasherweave Helmet
+    [51149] = 60,  -- Sanctified Lasherweave Pauldrons
+    [51145] = 95,  -- Sanctified Lasherweave Robes
+    [51148] = 60,  -- Sanctified Lasherweave Gloves
+    [51146] = 95,  -- Sanctified Lasherweave Legplates
     
     -- Hunter
-    -- [51286] = 95,  -- Sanctified Ahn'Kahar Blood Hunter's Headpiece
-    -- [51288] = 60,  -- Sanctified Ahn'Kahar Blood Hunter's Spaulders
-    -- [51289] = 95,  -- Sanctified Ahn'Kahar Blood Hunter's Tunic
-    -- [51287] = 60,  -- Sanctified Ahn'Kahar Blood Hunter's Handguards
-    -- [51285] = 95,  -- Sanctified Ahn'Kahar Blood Hunter's Legguards
+    [51286] = 95,  -- Sanctified Ahn'Kahar Blood Hunter's Headpiece
+    [51288] = 60,  -- Sanctified Ahn'Kahar Blood Hunter's Spaulders
+    [51289] = 95,  -- Sanctified Ahn'Kahar Blood Hunter's Tunic
+    [51287] = 60,  -- Sanctified Ahn'Kahar Blood Hunter's Handguards
+    [51285] = 95,  -- Sanctified Ahn'Kahar Blood Hunter's Legguards
     
     -- Mage
-    -- [51281] = 95,  -- Sanctified Bloodmage Hood
-    -- [51284] = 60,  -- Sanctified Bloodmage Shoulderpads
-    -- [51282] = 95,  -- Sanctified Bloodmage Robe
-    -- [51280] = 60,  -- Sanctified Bloodmage Gloves
-    -- [51283] = 95,  -- Sanctified Bloodmage Leggings
+    [51281] = 95,  -- Sanctified Bloodmage Hood
+    [51284] = 60,  -- Sanctified Bloodmage Shoulderpads
+    [51282] = 95,  -- Sanctified Bloodmage Robe
+    [51280] = 60,  -- Sanctified Bloodmage Gloves
+    [51283] = 95,  -- Sanctified Bloodmage Leggings
     
     -- Paladin
-    -- [51167] = 95,  -- Sanctified Lightsworn Faceguard (Tank)
-    -- [51161] = 95,  -- Sanctified Lightsworn Headpiece (Holy)
-    -- [51277] = 95,  -- Sanctified Lightsworn Helmet (Ret)
+    [51167] = 95,  -- Sanctified Lightsworn Faceguard (Tank)
+    [51161] = 95,  -- Sanctified Lightsworn Headpiece (Holy)
+    [51277] = 95,  -- Sanctified Lightsworn Helmet (Ret)
+    [51169] = 60,  -- Sanctified Lightsworn Shoulderguards (Tank)
+    [51163] = 60,  -- Sanctified Lightsworn Spaulders (Holy)
+    [51279] = 60,  -- Sanctified Lightsworn Shoulderplates (Ret)
     
     -- Priest
-    -- [51261] = 95,  -- Sanctified Crimson Acolyte Hood (Shadow)
-    -- [51178] = 95,  -- Sanctified Crimson Acolyte Cowl (Heal)
+    [51261] = 95,  -- Sanctified Crimson Acolyte Hood (Shadow)
+    [51178] = 95,  -- Sanctified Crimson Acolyte Cowl (Heal)
+    [51264] = 60,  -- Sanctified Crimson Acolyte Shoulderpads (Shadow)
+    [51181] = 60,  -- Sanctified Crimson Acolyte Mantle (Heal)
     
     -- Rogue
-    -- [51252] = 95,  -- Sanctified Shadowblade Helmet
-    -- [51254] = 60,  -- Sanctified Shadowblade Pauldrons
-    -- [51253] = 95,  -- Sanctified Shadowblade Breastplate
-    -- [51251] = 60,  -- Sanctified Shadowblade Gauntlets
-    -- [51250] = 95,  -- Sanctified Shadowblade Legplates
+    [51252] = 95,  -- Sanctified Shadowblade Helmet
+    [51254] = 60,  -- Sanctified Shadowblade Pauldrons
+    [51253] = 95,  -- Sanctified Shadowblade Breastplate
+    [51251] = 60,  -- Sanctified Shadowblade Gauntlets
+    [51250] = 95,  -- Sanctified Shadowblade Legplates
     
     -- Shaman
-    -- [51242] = 95,  -- Sanctified Frost Witch's Headpiece (Ele)
-    -- [51202] = 95,  -- Sanctified Frost Witch's Faceguard (Enh)
-    -- [51192] = 95,  -- Sanctified Frost Witch's Helm (Resto)
+    [51242] = 95,  -- Sanctified Frost Witch's Headpiece (Ele)
+    [51202] = 95,  -- Sanctified Frost Witch's Faceguard (Enh)
+    [51192] = 95,  -- Sanctified Frost Witch's Helm (Resto)
+    [51244] = 60,  -- Sanctified Frost Witch's Shoulderpads (Ele)
+    [51204] = 60,  -- Sanctified Frost Witch's Shoulderguards (Enh)
+    [51194] = 60,  -- Sanctified Frost Witch's Spaulders (Resto)
     
     -- Warlock
-    -- [51232] = 95,  -- Sanctified Dark Coven Hood
-    -- [51234] = 60,  -- Sanctified Dark Coven Shoulderpads
-    -- [51231] = 95,  -- Sanctified Dark Coven Robe
-    -- [51233] = 60,  -- Sanctified Dark Coven Gloves
-    -- [51230] = 95,  -- Sanctified Dark Coven Leggings
+    [51232] = 95,  -- Sanctified Dark Coven Hood
+    [51234] = 60,  -- Sanctified Dark Coven Shoulderpads
+    [51231] = 95,  -- Sanctified Dark Coven Robe
+    [51233] = 60,  -- Sanctified Dark Coven Gloves
+    [51230] = 95,  -- Sanctified Dark Coven Leggings
     
     -- Warrior
-    -- [51227] = 95,  -- Sanctified Ymirjar Lord's Helmet (DPS)
-    -- [51217] = 95,  -- Sanctified Ymirjar Lord's Greathelm (Tank)
+    [51227] = 95,  -- Sanctified Ymirjar Lord's Helmet (DPS)
+    [51217] = 95,  -- Sanctified Ymirjar Lord's Greathelm (Tank)
+    [51229] = 60,  -- Sanctified Ymirjar Lord's Pauldrons (DPS)
+    [51219] = 60,  -- Sanctified Ymirjar Lord's Shoulderplates (Tank)
     
     -- ==================
-    -- Trinkets & Misc
+    -- Trinkets & Misc (if available on your server)
     -- ==================
-    -- [50356] = 60,  -- Corroded Skeleton Key
-    -- [50355] = 60,  -- Herkuml War Token
-    -- [50357] = 60,  -- Maghia's Misguided Quill
-    -- [50358] = 60,  -- Purified Lunar Dust
+    [50356] = 60,  -- Corroded Skeleton Key
+    [50355] = 60,  -- Herkuml War Token
+    [50357] = 60,  -- Maghia's Misguided Quill
+    [50358] = 60,  -- Purified Lunar Dust
     
     -- ==================
-    -- Add your server's items below:
+    -- Add your server's specific items below:
+    -- Format: [itemId] = cost,
     -- ==================
     
 }
@@ -240,6 +252,11 @@ local CONQUEST_ITEMS = {
 
 RegisterEmblemItems("Emblem of Conquest", CONQUEST_ITEMS)
 
+
+-- ============================================================
+-- Emblem of Ascension Items
+-- ============================================================
+
 local ASCENSION_ITEMS = {
     -- Emblem of Ascension x12
     [40322] = 12, [40321] = 12, [40268] = 12, [40267] = 12, [40207] = 12, [40191] = 12, [39757] = 12, [40239] = 12, [39728] = 12,
@@ -283,6 +300,7 @@ local ASCENSION_ITEMS = {
 }
 
 RegisterEmblemItems("Emblem of Ascension", ASCENSION_ITEMS)
+
 
 -- ============================================================
 -- Utility Functions
