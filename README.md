@@ -1,4 +1,4 @@
-# BiS-Tooltip (WotLK 3.3.5a Backport + Custom Server Extensions)
+# BiS-Tooltip (WotLK 3.3.5a Backport + Stormforge:Frostmourne)
 Backport of **BiS-Tooltip** for **Wrath of the Lich King 3.3.5a**, extended with:
 - a **BiS Checklist UI**,
 - **multi-source item support** (boss drops + vendor/emblems),
