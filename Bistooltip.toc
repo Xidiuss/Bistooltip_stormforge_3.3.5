@@ -1,7 +1,7 @@
 ## Interface: 30300
 ## Title: BiS-Tooltip-3.3.5a
-## Author: Hellixoid, Dweem, Silver
-## Version: 1.2.0-3.3.5a
+## Author: Hellixoid, Dweem, Silver, Divian
+## Version: 1.3.8-3.3.5a
 ## Notes: Best-in-Slot tooltip and checklist addon for WotLK 3.3.5a
 ## SavedVariables: BisTooltipDB
 ## OptionalDeps: Ace3, DataStore, DataStore_Inventory

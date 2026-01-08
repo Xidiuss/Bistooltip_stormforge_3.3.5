@@ -173,9 +173,9 @@ BistooltipConstants.SPEC_BY_CLASSFILE_TAB = {
 BistooltipConstants.SPEC_TABLE_DEFAULT = {
     columns = {
         { weight = 45 },  -- Slot name
-        { width = 50 },   -- Enhancements
-        { width = 60 },   -- Top 1
-        { width = 60 },   -- Top 2
+        { width = 55 },   -- Enhancements (enchants | gems)
+        { width = 55 },   -- BIS
+        { width = 55 },   -- Top 2
         { width = 48 },   -- Top 3
         { width = 48 },   -- Top 4
         { width = 48 },   -- Top 5
@@ -187,14 +187,31 @@ BistooltipConstants.SPEC_TABLE_DEFAULT = {
 
 BistooltipConstants.SPEC_TABLE_CHECKLIST = {
     columns = {
-        { width = 90 },   -- Slot (wider for visibility)
-        { weight = 55 },  -- Plan (Boss/Item/Enchant) - takes more space
-        { width = 60 },   -- BIS
-        { width = 60 },   -- BIS2
+        { width = 80 },   -- Slot (slightly smaller)
+        { weight = 65 },  -- Plan (Boss/Item/Enchant/Gems) - MORE space for gems
+        { width = 54 },   -- BIS
+        { width = 54 },   -- BIS2
         { width = 48 },   -- Alt 3
         { width = 48 },   -- Alt 4
         { width = 48 },   -- Alt 5
         { width = 48 },   -- Alt 6
+    },
+    space = 2,
+    align = "middle",
+}
+
+-- Customize mode with extra column for lock icons
+BistooltipConstants.SPEC_TABLE_CUSTOMIZE = {
+    columns = {
+        { width = 85 },   -- Slot
+        { weight = 50 },  -- Plan
+        { width = 55 },   -- BIS
+        { width = 55 },   -- BIS2
+        { width = 45 },   -- Alt 3
+        { width = 45 },   -- Alt 4
+        { width = 45 },   -- Alt 5
+        { width = 45 },   -- Alt 6
+        { width = 35 },   -- Lock icon
     },
     space = 2,
     align = "middle",
@@ -512,7 +529,17 @@ function BistooltipConstants.GetTierNumber(phase)
     return 999
 end
 
--- Combine consecutive BIS phases: "T7 BIS / T8 BIS / T9 BIS" -> "BIS T7-T9"
+-- Get phase index from Bistooltip_wowtbc_phases (for consecutive detection)
+function BistooltipConstants.GetPhaseIndex(phase)
+    if not phase then return 999 end
+    local p = BistooltipConstants.NormalizePhase(phase)
+    
+    -- Use actual phase order: PR, T7, T8, T9, T10, RS
+    local phaseOrder = { PR = 1, T7 = 2, T8 = 3, T9 = 4, T10 = 5, RS = 6 }
+    return phaseOrder[p] or 999
+end
+
+-- Combine consecutive BIS phases: "PR BIS / T7 BIS / T8 BIS" -> "BIS PR-T8"
 function BistooltipConstants.CombineBISPhases(phasesText)
     if not phasesText or phasesText == "" then return phasesText end
     
@@ -537,12 +564,12 @@ function BistooltipConstants.CombineBISPhases(phasesText)
         end
     end
     
-    -- Sort phases by tier number
-    local function sortByTier(a, b)
-        return BistooltipConstants.GetTierNumber(a) < BistooltipConstants.GetTierNumber(b)
+    -- Sort phases by phase index (actual order: PR, T7, T8, T9, T10, RS)
+    local function sortByPhaseIndex(a, b)
+        return BistooltipConstants.GetPhaseIndex(a) < BistooltipConstants.GetPhaseIndex(b)
     end
     
-    table.sort(bisPhases, sortByTier)
+    table.sort(bisPhases, sortByPhaseIndex)
     
     -- Build combined string
     local parts = {}
@@ -550,18 +577,19 @@ function BistooltipConstants.CombineBISPhases(phasesText)
     -- Combine BIS phases
     if #bisPhases > 0 then
         if #bisPhases == 1 then
-            table.insert(parts, bisPhases[1] .. " BIS")
+            -- Single BIS phase - add green color
+            table.insert(parts, "|cff00ff00" .. bisPhases[1] .. " BIS|r")
         elseif #bisPhases >= 2 then
-            -- Check if consecutive
+            -- Check if consecutive using phase index (PR=1, T7=2, T8=3, etc)
             local first = bisPhases[1]
             local last = bisPhases[#bisPhases]
             local isConsecutive = true
             
             for i = 2, #bisPhases do
-                local prevTier = BistooltipConstants.GetTierNumber(bisPhases[i-1])
-                local currTier = BistooltipConstants.GetTierNumber(bisPhases[i])
-                -- Allow gaps of up to 1 tier (T7->T8, T8->T9, etc)
-                if currTier - prevTier > 1.5 then
+                local prevIdx = BistooltipConstants.GetPhaseIndex(bisPhases[i-1])
+                local currIdx = BistooltipConstants.GetPhaseIndex(bisPhases[i])
+                -- Consecutive means index difference of exactly 1
+                if currIdx - prevIdx ~= 1 then
                     isConsecutive = false
                     break
                 end
@@ -570,9 +598,9 @@ function BistooltipConstants.CombineBISPhases(phasesText)
             if isConsecutive and #bisPhases >= 2 then
                 table.insert(parts, "|cff00ff00BIS " .. first .. "-" .. last .. "|r")
             else
-                -- Not consecutive, list individually
+                -- Not consecutive, list individually with green color
                 for _, p in ipairs(bisPhases) do
-                    table.insert(parts, p .. " BIS")
+                    table.insert(parts, "|cff00ff00" .. p .. " BIS|r")
                 end
             end
         end

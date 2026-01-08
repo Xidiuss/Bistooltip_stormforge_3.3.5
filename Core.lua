@@ -23,7 +23,8 @@ BistooltipAddon = LibStub("AceAddon-3.0"):NewAddon("Bis-Tooltip")
 -- ============================================================
 
 local ADDON_NAME = "Bis-Tooltip"
-local ADDON_VERSION = "1.1.0-3.3.5a"
+local ADDON_VERSION = "1.3.8-3.3.5a"
+local ADDON_CREDITS = "backport by Silver [DisruptionAuras]"
 local SCAN_DEBOUNCE = 0.25
 
 -- ============================================================
@@ -226,7 +227,8 @@ function BistooltipAddon:OnInitialize()
 
     -- Set addon info
     self.AceAddonName = ADDON_NAME
-    self.AddonNameAndVersion = ADDON_NAME .. " " .. ADDON_VERSION .. " backport by Silver [DisruptionAuras]"
+    self.AddonNameAndVersion = ADDON_NAME .. " " .. ADDON_VERSION .. " enchanted by Divian"
+    self.AddonCredits = ADDON_CREDITS
     self.Version = ADDON_VERSION
 
     -- Initialize configuration
